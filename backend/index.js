@@ -4,9 +4,9 @@ import mongoose from "mongoose";
 import cors from "cors";
 
 // Import your routes
-import taskRoutes from "./routes/taskRoutes.js";
-import userRoutes from "./routes/userRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
+import taskRoutes from "./src/routes/taskRoutes.js";
+import userRoutes from "./src/routes/userRoutes.js";
+import adminRoutes from "./src/routes/adminRoutes.js";
 
 dotenv.config();
 const app = express();
