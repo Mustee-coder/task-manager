@@ -17,11 +17,13 @@ app.use(express.json());
 // Enable CORS
 app.use(
   cors({
-    origin: "https://task-manager-xi-rouge-90.vercel.app", 
-    methods: ["GET", "POST", "PUT", "DELETE","PATCH"],
+    origin: [
+      "http://localhost:5173",
+      "https://task-manager-xi-rouge-90.vercel.app",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
   })
-  
 );
 
 // Use routes with explicit paths to avoid collisions
