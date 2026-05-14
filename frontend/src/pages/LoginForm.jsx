@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 
+const API = import.meta.env.VITE_API_URL;
+
 const LoginForm = () => {
   const navigate = useNavigate();
 
@@ -27,18 +29,17 @@ const LoginForm = () => {
 
     try {
       const { data } = await axios.post(
-        "http://localhost:5000/api/users/login",
+        `${API}/api/users/login`,
         formData
       );
 
-      // ✅ Save token & role
+      // Save auth data
       localStorage.setItem("token", data.token);
       localStorage.setItem("userRole", data.user.role);
 
-      // ✅ Attach token globally (IMPORTANT FIX)
-      axios.defaults.headers.common[
-        "Authorization"
-      ] = `Bearer ${data.token}`;
+      // Set global axios header
+      axios.defaults.headers.common["Authorization"] =
+        `Bearer ${data.token}`;
 
       toast.success("Login successful");
 
@@ -50,7 +51,9 @@ const LoginForm = () => {
         }
       }, 800);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Login failed");
+      toast.error(
+        error.response?.data?.message || "Login failed"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -58,11 +61,13 @@ const LoginForm = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-md bg-white border border-gray-200 
-                   rounded-lg shadow-md p-6 space-y-5"
+        className="w-full max-w-md bg-white border border-gray-200 rounded-lg shadow-md p-6 space-y-5"
       >
+
+        {/* Header */}
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-800">
             Task Manager Login
@@ -72,6 +77,7 @@ const LoginForm = () => {
           </p>
         </div>
 
+        {/* Email */}
         <input
           type="email"
           name="email"
@@ -79,11 +85,10 @@ const LoginForm = () => {
           onChange={handleChange}
           placeholder="Email address"
           required
-          className="w-full px-4 py-3 border border-gray-300 
-                     rounded-md text-gray-700 
-                     focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="w-full px-4 py-3 border border-gray-300 rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
 
+        {/* Password */}
         <div className="relative">
           <input
             type={showPassword ? "text" : "password"}
@@ -92,30 +97,27 @@ const LoginForm = () => {
             onChange={handleChange}
             placeholder="Password"
             required
-            className="w-full px-4 py-3 border border-gray-300 
-                       rounded-md text-gray-700 pr-10
-                       focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-4 py-3 border border-gray-300 rounded-md text-gray-700 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
 
           <span
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 
-                       cursor-pointer text-gray-500 hover:text-gray-700"
+            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500 hover:text-gray-700"
           >
             {showPassword ? <FaEyeSlash /> : <FaEye />}
           </span>
         </div>
 
+        {/* Button */}
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-blue-600 text-white py-3 rounded-md 
-                     hover:bg-blue-700 transition 
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? "Logging in..." : "Login"}
         </button>
 
+        {/* Signup link */}
         <p className="text-center text-sm text-gray-600">
           Don't have an account?{" "}
           <span
@@ -125,6 +127,7 @@ const LoginForm = () => {
             Sign up
           </span>
         </p>
+
       </form>
     </div>
   );

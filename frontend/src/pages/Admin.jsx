@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -14,6 +14,22 @@ import {
 import TaskManagerLogo from "../components/TaskManagerLogo";
 import ThemeSelector from "../components/ThemeSelector";
 
+const API = import.meta.env.VITE_API_URL;
+
+// Axios instance (created once)
+const api = axios.create({
+  baseURL: `${API}/api`,
+});
+
+// Attach token automatically
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 const Admin = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [totalUsers, setTotalUsers] = useState(0);
@@ -22,55 +38,32 @@ const Admin = () => {
   const [pendingTasks, setPendingTasks] = useState(0);
 
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
   const role = localStorage.getItem("userRole");
 
-  // 🔥 AXIOS INSTANCE
-  const api = axios.create({
-    baseURL: "https://task-manager-q4g7.onrender.com/api",
-  });
-
-  // 🔥 AUTO TOKEN ATTACHMENT (FIX LOGIN ISSUES)
-  api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("token");
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-  });
-
-  const toggleSidebar = () =>
-    setSidebarOpen((prev) => !prev);
+  const toggleSidebar = () => setSidebarOpen((p) => !p);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userRole");
+    localStorage.clear();
     navigate("/login");
   };
 
-  // Fetch stats
   const fetchStats = async () => {
     try {
-      const resUsers = await api.get("/admin/users");
-      const resTasks = await api.get("/admin/tasks");
+      const [usersRes, tasksRes] = await Promise.all([
+        api.get("/admin/users"),
+        api.get("/admin/tasks"),
+      ]);
 
-      const users = resUsers.data;
-      const tasks = resTasks.data;
+      const users = usersRes?.data || [];
+      const tasks = tasksRes?.data || [];
 
       setTotalUsers(users.length);
       setTotalTasks(tasks.length);
-      setCompletedTasks(
-        tasks.filter((t) => t.completed).length
-      );
-      setPendingTasks(
-        tasks.filter((t) => !t.completed).length
-      );
+      setCompletedTasks(tasks.filter((t) => t.completed).length);
+      setPendingTasks(tasks.filter((t) => !t.completed).length);
     } catch (error) {
       toast.error(
-        error.response?.data?.message ||
-          "Failed to load dashboard"
+        error.response?.data?.message || "Failed to load dashboard"
       );
     }
   };
@@ -79,61 +72,39 @@ const Admin = () => {
     fetchStats();
   }, []);
 
-  const chartData = [
-    {
-      name: "Completed",
-      completed: completedTasks,
-      pending: 0,
-    },
-    {
-      name: "Pending",
-      completed: 0,
-      pending: pendingTasks,
-    },
-  ];
+  const chartData = useMemo(
+    () => [
+      {
+        name: "Tasks",
+        completed: completedTasks,
+        pending: pendingTasks,
+      },
+    ],
+    [completedTasks, pendingTasks]
+  );
 
   return (
     <div className="flex h-screen bg-gray-100">
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 left-0 h-full w-44 bg-white shadow-md flex flex-col p-6 transform transition-transform duration-300 z-50 ${
-          sidebarOpen
-            ? "translate-x-0"
-            : "-translate-x-full"
+        className={`fixed top-0 left-0 h-full w-44 bg-white shadow-md p-6 transform transition-transform z-50 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <h1 className="text-lg font-bold mb-4 text-green-500">
           Admin Panel
         </h1>
 
-        <button
-          className="mb-3 p-2 hover:bg-gray-100 rounded font-semibold"
-          onClick={() => {
-            navigate("/admin");
-            setSidebarOpen(false);
-          }}
-        >
+        <button onClick={() => navigate("/admin")} className="mb-3 p-2">
           Dashboard
         </button>
 
-        <button
-          className="mb-3 p-2 hover:bg-gray-100 rounded font-semibold"
-          onClick={() => {
-            navigate("/usermanagement");
-            setSidebarOpen(false);
-          }}
-        >
+        <button onClick={() => navigate("/usermanagement")} className="mb-3 p-2">
           User Management
         </button>
 
-        <button
-          className="mb-3 p-2 hover:bg-gray-100 rounded font-semibold"
-          onClick={() => {
-            navigate("/dashboard");
-            setSidebarOpen(false);
-          }}
-        >
+        <button onClick={() => navigate("/dashboard")} className="mb-3 p-2">
           User Dashboard
         </button>
       </div>
@@ -142,11 +113,11 @@ const Admin = () => {
       <div className="flex-1 flex flex-col overflow-auto">
 
         {/* Navbar */}
-        <nav className="bg-white px-4 py-3 flex justify-between items-center shadow-md sticky top-0 z-40">
+        <nav className="bg-white px-4 py-3 flex justify-between shadow-md">
           <div className="flex items-center gap-4">
             <button
               onClick={toggleSidebar}
-              className="w-9 h-9 rounded bg-blue-500 text-white"
+              className="w-9 h-9 bg-blue-500 text-white rounded"
             >
               ☰
             </button>
@@ -162,15 +133,9 @@ const Admin = () => {
                 👤
               </button>
 
-              <div className="absolute right-0 mt-2 w-40 bg-white shadow-lg rounded-lg p-2 hidden group-hover:block">
-                <p className="px-3 py-2 text-sm text-gray-500">
-                  {role}
-                </p>
-
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-3 py-2 text-red-500 hover:bg-gray-100"
-                >
+              <div className="absolute right-0 hidden group-hover:block bg-white shadow-lg p-2 rounded">
+                <p className="text-sm text-gray-500">{role}</p>
+                <button onClick={handleLogout} className="text-red-500">
                   Logout
                 </button>
               </div>
@@ -179,9 +144,9 @@ const Admin = () => {
         </nav>
 
         {/* Content */}
-        <div className="p-6 md:p-8 lg:p-12">
+        <div className="p-6">
 
-          <h1 className="text-3xl font-bold mb-8 text-center">
+          <h1 className="text-3xl font-bold text-center mb-8">
             Admin Dashboard
           </h1>
 
@@ -189,21 +154,21 @@ const Admin = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-10">
 
             <div className="bg-white p-6 rounded-xl shadow text-center">
-              <h2 className="text-3xl font-bold text-blue-500">
+              <h2 className="text-3xl text-blue-500 font-bold">
                 {totalUsers}
               </h2>
               <p>Total Users</p>
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow text-center">
-              <h2 className="text-3xl font-bold text-purple-500">
+              <h2 className="text-3xl text-purple-500 font-bold">
                 {totalTasks}
               </h2>
               <p>Total Tasks</p>
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow text-center">
-              <h2 className="text-3xl font-bold text-green-500">
+              <h2 className="text-3xl text-green-500 font-bold">
                 {completedTasks}
               </h2>
               <p>Completed Tasks</p>
@@ -211,9 +176,7 @@ const Admin = () => {
 
             <div
               className="bg-white p-6 rounded-xl shadow text-center cursor-pointer"
-              onClick={() =>
-                navigate("/usermanagement")
-              }
+              onClick={() => navigate("/usermanagement")}
             >
               <h2 className="text-3xl">👤</h2>
               <p>User Management</p>

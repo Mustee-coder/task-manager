@@ -2,26 +2,35 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
+const API = import.meta.env.VITE_API_URL;
+
+// create axios instance ONCE
+const api = axios.create({
+  baseURL: `${API}/api`,
+});
+
+// attach token ONCE
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
 const PendingTasks = () => {
   const [tasks, setTasks] = useState([]);
 
-  // 🔥 CLEAN AXIOS INSTANCE
-  const api = axios.create({
-    baseURL: "https://task-manager-q4g7.onrender.com/api",
-  });
-
-  // 🔥 AUTO ATTACH TOKEN
-  api.interceptors.request.use((config) => {
+  const fetchTasks = async () => {
     const token = localStorage.getItem("token");
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (!token) {
+      toast.error("Session expired. Please login again.");
+      return;
     }
 
-    return config;
-  });
-
-  const fetchTasks = async () => {
     try {
       const { data } = await api.get("/tasks");
 
@@ -37,7 +46,6 @@ const PendingTasks = () => {
     fetchTasks();
   }, []);
 
-  // mark as completed
   const completeTask = async (id) => {
     try {
       await api.patch(`/tasks/${id}/complete`);

@@ -3,6 +3,8 @@ import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import TaskCard from "../components/TaskCard";
 
+const API = import.meta.env.VITE_API_URL;
+
 const ViewTasks = () => {
   const [pendingTasks, setPendingTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
@@ -14,7 +16,7 @@ const ViewTasks = () => {
 
   const token = localStorage.getItem("token");
 
-  // 🔥 SAFE FETCH WRAPPER (fixes login/unauthorized issues)
+  // SAFE FETCH WRAPPER
   const fetchWithAuth = async (url, options = {}) => {
     const res = await fetch(url, {
       ...options,
@@ -26,17 +28,18 @@ const ViewTasks = () => {
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Request failed");
+
+    if (!res.ok) {
+      throw new Error(data.message || "Request failed");
+    }
 
     return data;
   };
 
-  // Fetch tasks
+  // FETCH TASKS
   const fetchTasks = async () => {
     try {
-      const data = await fetchWithAuth(
-        "https://task-manager-q4g7.onrender.com/api/tasks"
-      );
+      const data = await fetchWithAuth(`${API}/api/tasks`);
 
       setPendingTasks(data.pending || []);
       setCompletedTasks(data.completed || []);
@@ -49,15 +52,14 @@ const ViewTasks = () => {
     fetchTasks();
   }, []);
 
-  // Delete task
+  // DELETE TASK
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this task?")) return;
 
     try {
-      await fetchWithAuth(
-        `http://localhost:5000/api/tasks/${id}`,
-        { method: "DELETE" }
-      );
+      await fetchWithAuth(`${API}/api/tasks/${id}`, {
+        method: "DELETE",
+      });
 
       toast.success("Task deleted");
       fetchTasks();
@@ -66,16 +68,13 @@ const ViewTasks = () => {
     }
   };
 
-  // Update task
+  // UPDATE TASK
   const handleUpdate = async (id, updates) => {
     try {
-      await fetchWithAuth(
-        `http://localhost:5000/api/tasks/${id}`,
-        {
-          method: "PUT",
-          body: JSON.stringify(updates),
-        }
-      );
+      await fetchWithAuth(`${API}/api/tasks/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(updates),
+      });
 
       toast.success("Task updated");
       setEditingTaskId(null);
@@ -85,7 +84,7 @@ const ViewTasks = () => {
     }
   };
 
-  // Toggle complete
+  // TOGGLE COMPLETE
   const toggleComplete = async (task) => {
     try {
       const endpoint = task.completed
@@ -93,7 +92,7 @@ const ViewTasks = () => {
         : "complete";
 
       await fetchWithAuth(
-        `http://localhost:5000/api/tasks/${task._id}/${endpoint}`,
+        `${API}/api/tasks/${task._id}/${endpoint}`,
         { method: "PATCH" }
       );
 
@@ -103,17 +102,13 @@ const ViewTasks = () => {
     }
   };
 
-  // Filter tasks
+  // FILTER TASKS
   const filteredPending = pendingTasks.filter((task) =>
-    task.title
-      .toLowerCase()
-      .includes(search.toLowerCase())
+    task.title.toLowerCase().includes(search.toLowerCase())
   );
 
   const filteredCompleted = completedTasks.filter((task) =>
-    task.title
-      .toLowerCase()
-      .includes(search.toLowerCase())
+    task.title.toLowerCase().includes(search.toLowerCase())
   );
 
   const tasksToShow =
@@ -126,6 +121,7 @@ const ViewTasks = () => {
       <Navbar />
 
       <div className="max-w-3xl mx-auto mt-10">
+
         <div className="card bg-base-200 shadow-xl">
           <div className="card-body">
 
@@ -133,22 +129,20 @@ const ViewTasks = () => {
               All Tasks
             </h1>
 
-            {/* Search */}
+            {/* SEARCH */}
             <input
-              type="text"
-              placeholder="Search tasks..."
               className="input input-bordered w-full mb-4"
+              placeholder="Search tasks..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
 
-            {/* Tabs */}
+            {/* TABS */}
             <div className="tabs tabs-boxed mb-4">
+
               <button
                 className={`tab ${
-                  activeTab === "pending"
-                    ? "tab-active"
-                    : ""
+                  activeTab === "pending" ? "tab-active" : ""
                 }`}
                 onClick={() => setActiveTab("pending")}
               >
@@ -157,20 +151,18 @@ const ViewTasks = () => {
 
               <button
                 className={`tab ${
-                  activeTab === "completed"
-                    ? "tab-active"
-                    : ""
+                  activeTab === "completed" ? "tab-active" : ""
                 }`}
-                onClick={() =>
-                  setActiveTab("completed")
-                }
+                onClick={() => setActiveTab("completed")}
               >
                 Completed ({completedTasks.length})
               </button>
+
             </div>
 
-            {/* Task list */}
+            {/* TASK LIST */}
             <div className="space-y-4">
+
               {tasksToShow.length === 0 && (
                 <p className="text-gray-500">
                   No tasks available
@@ -182,26 +174,22 @@ const ViewTasks = () => {
                   key={task._id}
                   task={task}
                   editingTaskId={editingTaskId}
-                  setEditingTaskId={
-                    setEditingTaskId
-                  }
+                  setEditingTaskId={setEditingTaskId}
                   editTitle={editTitle}
                   setEditTitle={setEditTitle}
-                  editDescription={
-                    editDescription
-                  }
-                  setEditDescription={
-                    setEditDescription
-                  }
+                  editDescription={editDescription}
+                  setEditDescription={setEditDescription}
                   handleUpdate={handleUpdate}
                   handleDelete={handleDelete}
                   toggleComplete={toggleComplete}
                 />
               ))}
+
             </div>
 
           </div>
         </div>
+
       </div>
     </>
   );

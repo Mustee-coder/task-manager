@@ -1,8 +1,26 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import TaskCard from "../components/TaskCard";
+
+const API = import.meta.env.VITE_API_URL;
+
+// Axios instance (created once)
+const axiosInstance = axios.create({
+  baseURL: `${API}/api`,
+});
+
+// Attach token once
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
 
 const Tasks = () => {
   const [pendingTasks, setPendingTasks] = useState([]);
@@ -18,27 +36,22 @@ const Tasks = () => {
 
   const editInputRef = useRef(null);
 
-  // 🔥 CLEAN AXIOS INSTANCE (NO STATIC TOKEN)
-  const axiosInstance = axios.create({
-    baseURL: "https://task-manager-q4g7.onrender.com/api",
-  });
+  const getToken = () => localStorage.getItem("token");
 
-  // 🔥 ADD INTERCEPTOR (AUTO TOKEN ATTACH)
-  axiosInstance.interceptors.request.use((config) => {
-    const token = localStorage.getItem("token");
+  // FETCH TASKS
+  const fetchTasks = async () => {
+    const token = getToken();
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (!token) {
+      toast.error("Session expired. Please login again.");
+      return;
     }
 
-    return config;
-  });
-
-  // Fetch tasks
-  const fetchTasks = async () => {
     setLoading(true);
+
     try {
       const res = await axiosInstance.get("/tasks");
+
       setPendingTasks(res.data.pending || []);
       setCompletedTasks(res.data.completed || []);
     } catch (error) {
@@ -52,14 +65,13 @@ const Tasks = () => {
     fetchTasks();
   }, []);
 
-  // Auto-focus edit input
   useEffect(() => {
     if (editingTaskId && editInputRef.current) {
       editInputRef.current.focus();
     }
   }, [editingTaskId]);
 
-  // Create task
+  // CREATE TASK
   const handleCreate = async (e) => {
     e.preventDefault();
 
@@ -70,7 +82,7 @@ const Tasks = () => {
       });
 
       toast.success("Task created");
-      setPendingTasks([...pendingTasks, res.data.task]);
+      setPendingTasks((prev) => [...prev, res.data.task]);
       setTitle("");
       setDescription("");
     } catch (error) {
@@ -78,25 +90,30 @@ const Tasks = () => {
     }
   };
 
-  // Delete task
+  // DELETE TASK
   const handleDelete = async (task) => {
     if (!window.confirm("Delete this task?")) return;
 
     try {
       await axiosInstance.delete(`/tasks/${task._id}`);
+
       toast.success("Task deleted");
 
       if (task.completed) {
-        setCompletedTasks(completedTasks.filter((t) => t._id !== task._id));
+        setCompletedTasks((prev) =>
+          prev.filter((t) => t._id !== task._id)
+        );
       } else {
-        setPendingTasks(pendingTasks.filter((t) => t._id !== task._id));
+        setPendingTasks((prev) =>
+          prev.filter((t) => t._id !== task._id)
+        );
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to delete");
     }
   };
 
-  // Update task
+  // UPDATE TASK
   const handleUpdate = async (task) => {
     if (!editTitle.trim()) {
       toast.error("Title cannot be empty");
@@ -112,31 +129,22 @@ const Tasks = () => {
       toast.success("Task updated");
       setEditingTaskId(null);
 
-      const updatedTask = {
-        ...task,
-        title: editTitle,
-        description: editDescription,
-      };
+      const update = (list) =>
+        list.map((t) =>
+          t._id === task._id
+            ? { ...t, title: editTitle, description: editDescription }
+            : t
+        );
 
-      if (task.completed) {
-        setCompletedTasks(
-          completedTasks.map((t) =>
-            t._id === task._id ? updatedTask : t
-          )
-        );
-      } else {
-        setPendingTasks(
-          pendingTasks.map((t) =>
-            t._id === task._id ? updatedTask : t
-          )
-        );
-      }
+      task.completed
+        ? setCompletedTasks(update)
+        : setPendingTasks(update);
     } catch (error) {
       toast.error(error.response?.data?.message || "Update failed");
     }
   };
 
-  // Toggle complete
+  // TOGGLE COMPLETE
   const toggleComplete = async (task) => {
     try {
       const endpoint = task.completed ? "pending" : "complete";
@@ -145,65 +153,51 @@ const Tasks = () => {
         `/tasks/${task._id}/${endpoint}`
       );
 
-      if (task.completed) {
-        setCompletedTasks(
-          completedTasks.filter((t) => t._id !== task._id)
-        );
-        setPendingTasks([
-          ...pendingTasks,
-          { ...task, completed: false },
-        ]);
-      } else {
-        setPendingTasks(
-          pendingTasks.filter((t) => t._id !== task._id)
-        );
-        setCompletedTasks([
-          ...completedTasks,
-          { ...task, completed: true },
-        ]);
-      }
+      fetchTasks();
     } catch (error) {
       toast.error(error.response?.data?.message || "Toggle failed");
     }
   };
 
-  // Filter tasks
-  const tasksToShow =
-    activeTab === "pending"
-      ? pendingTasks.filter((t) =>
-          t.title.toLowerCase().includes(search.toLowerCase())
-        )
-      : completedTasks.filter((t) =>
-          t.title.toLowerCase().includes(search.toLowerCase())
-        );
+  // FILTERED TASKS (optimized)
+  const tasksToShow = useMemo(() => {
+    const list =
+      activeTab === "pending" ? pendingTasks : completedTasks;
+
+    return list.filter((t) =>
+      t.title.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [activeTab, pendingTasks, completedTasks, search]);
 
   return (
     <>
       <Navbar />
 
       <div className="max-w-3xl mx-auto mt-10">
+
         <div className="card bg-base-200 shadow-xl">
           <div className="card-body">
+
             <h1 className="text-2xl font-bold mb-4">
               Task Manager
             </h1>
 
-            {/* Create Task */}
+            {/* Create */}
             <form onSubmit={handleCreate} className="space-y-3 mb-6">
               <input
                 type="text"
-                placeholder="Task title"
                 className="input input-bordered w-full"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                placeholder="Task title"
                 required
               />
 
               <textarea
-                placeholder="Task description"
                 className="textarea textarea-bordered w-full"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                placeholder="Task description"
                 required
               />
 
@@ -214,11 +208,10 @@ const Tasks = () => {
 
             {/* Search */}
             <input
-              type="text"
-              placeholder="Search tasks..."
               className="input input-bordered w-full mb-4"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tasks..."
             />
 
             {/* Tabs */}
@@ -242,11 +235,9 @@ const Tasks = () => {
               </button>
             </div>
 
-            {/* Task List */}
+            {/* Tasks */}
             {loading ? (
-              <p className="text-center text-gray-500">
-                Loading tasks...
-              </p>
+              <p className="text-center">Loading...</p>
             ) : (
               <div className="space-y-4">
                 {tasksToShow.length === 0 && (
@@ -273,6 +264,7 @@ const Tasks = () => {
                 ))}
               </div>
             )}
+
           </div>
         </div>
       </div>

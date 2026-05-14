@@ -1,8 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import { Trash2, ShieldCheck, Lock, Unlock } from "lucide-react";
+
+const API = import.meta.env.VITE_API_URL;
+
+// 🔥 CREATE AXIOS INSTANCE ONCE (OUTSIDE COMPONENT)
+const api = axios.create({
+  baseURL: `${API}/api`,
+});
+
+// 🔥 AUTO ATTACH TOKEN
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -14,33 +32,21 @@ const UserManagement = () => {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+
   const usersPerPage = 5;
 
-  // 🔥 CLEAN AXIOS INSTANCE
-  const api = axios.create({
-    baseURL: "https://task-manager-q4g7.onrender.com/api",
-  });
-
-  // 🔥 AUTO ATTACH TOKEN (IMPORTANT FIX)
-  api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("token");
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-  });
-
-  // Fetch users
+  // FETCH USERS
   const fetchUsers = async () => {
+    setLoading(true);
+
     try {
       const { data } = await api.get("/admin/users");
       setUsers(data);
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || error.message
-      );
+      toast.error(error.response?.data?.message || "Failed to fetch users");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -48,102 +54,93 @@ const UserManagement = () => {
     fetchUsers();
   }, []);
 
-  // Debounce search
+  // DEBOUNCE SEARCH
   useEffect(() => {
-    const handler = setTimeout(() => {
+    const timer = setTimeout(() => {
       setDebouncedSearch(search);
       setCurrentPage(1);
-    }, 500);
+    }, 400);
 
-    return () => clearTimeout(handler);
+    return () => clearTimeout(timer);
   }, [search]);
 
-  // Delete user
+  // DELETE USER
   const deleteUser = async (id) => {
     try {
       await api.delete(`/admin/users/${id}`);
 
-      setUsers(users.filter((u) => u._id !== id));
+      setUsers((prev) => prev.filter((u) => u._id !== id));
       toast.success("User deleted");
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || error.message
-      );
+      toast.error(error.response?.data?.message || "Delete failed");
     }
   };
 
-  // Promote user
+  // PROMOTE USER
   const promoteUser = async (id) => {
     try {
       await api.put(`/admin/promote/${id}`);
 
-      setUsers(
-        users.map((u) =>
+      setUsers((prev) =>
+        prev.map((u) =>
           u._id === id ? { ...u, role: "admin" } : u
         )
       );
 
-      toast.success("User promoted to admin");
+      toast.success("User promoted");
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || error.message
-      );
+      toast.error(error.response?.data?.message || "Failed");
     }
   };
 
-  // Block / Unblock user
+  // BLOCK / UNBLOCK
   const toggleBlock = async (id) => {
     try {
       await api.patch(`/admin/users/${id}/block`);
 
-      setUsers(
-        users.map((u) =>
+      setUsers((prev) =>
+        prev.map((u) =>
           u._id === id
             ? { ...u, isBlocked: !u.isBlocked }
             : u
         )
       );
 
-      toast.success("User status updated");
+      toast.success("Status updated");
     } catch (error) {
-      toast.error(
-        error.response?.data?.message || error.message
-      );
+      toast.error(error.response?.data?.message || "Failed");
     }
   };
 
-  // Filter logic
-  const filteredUsers = users.filter((user) => {
-    const matchSearch =
-      user.name
-        .toLowerCase()
-        .includes(debouncedSearch.toLowerCase()) ||
-      user.email
-        .toLowerCase()
-        .includes(debouncedSearch.toLowerCase());
+  // FILTER USERS (OPTIMIZED)
+  const filteredUsers = useMemo(() => {
+    return users.filter((user) => {
+      const matchSearch =
+        user.name
+          .toLowerCase()
+          .includes(debouncedSearch.toLowerCase()) ||
+        user.email
+          .toLowerCase()
+          .includes(debouncedSearch.toLowerCase());
 
-    const matchRole =
-      roleFilter === "all" || user.role === roleFilter;
+      const matchRole =
+        roleFilter === "all" || user.role === roleFilter;
 
-    const matchStatus =
-      statusFilter === "all" ||
-      (statusFilter === "active" && !user.isBlocked) ||
-      (statusFilter === "blocked" && user.isBlocked);
+      const matchStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && !user.isBlocked) ||
+        (statusFilter === "blocked" && user.isBlocked);
 
-    return matchSearch && matchRole && matchStatus;
-  });
+      return matchSearch && matchRole && matchStatus;
+    });
+  }, [users, debouncedSearch, roleFilter, statusFilter]);
 
-  // Pagination
-  const indexOfLastUser = currentPage * usersPerPage;
-  const indexOfFirstUser = indexOfLastUser - usersPerPage;
-  const currentUsers = filteredUsers.slice(
-    indexOfFirstUser,
-    indexOfLastUser
-  );
+  // PAGINATION
+  const indexOfLast = currentPage * usersPerPage;
+  const indexOfFirst = indexOfLast - usersPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirst, indexOfLast);
 
-  const totalPages = Math.ceil(
-    filteredUsers.length / usersPerPage
-  );
+  const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
 
   return (
     <>
@@ -152,16 +149,16 @@ const UserManagement = () => {
       <div className="max-w-3xl mx-auto">
         <div className="card bg-base-200 shadow-xl p-4">
 
-          <h1 className="text-3xl font-bold mb-6 text-center">
+          <h1 className="text-3xl font-bold text-center mb-6">
             User Management
           </h1>
 
-          {/* Filters */}
+          {/* FILTERS */}
           <div className="flex flex-col sm:flex-row gap-3 justify-center mb-4">
+
             <input
-              type="text"
-              placeholder="Search by name or email..."
               className="input input-bordered"
+              placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -188,183 +185,156 @@ const UserManagement = () => {
           </div>
 
           <p className="text-center text-gray-500 mb-3">
-            Showing {filteredUsers.length} users
+            {filteredUsers.length} users found
           </p>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="table w-full">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
+          {/* TABLE */}
+          {loading ? (
+            <p className="text-center">Loading...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table w-full">
 
-              <tbody>
-                {currentUsers.map((user, index) => (
-                  <tr key={user._id}>
-                    <td>{indexOfFirstUser + index + 1}</td>
-                    <td>{user.name}</td>
-                    <td>{user.email}</td>
-
-                    <td>
-                      <span
-                        className={`badge ${
-                          user.role === "admin"
-                            ? "badge-success"
-                            : "badge-ghost"
-                        }`}
-                      >
-                        {user.role}
-                      </span>
-                    </td>
-
-                    <td>
-                      <span
-                        className={`badge ${
-                          user.isBlocked
-                            ? "badge-error"
-                            : "badge-success"
-                        }`}
-                      >
-                        {user.isBlocked
-                          ? "Blocked"
-                          : "Active"}
-                      </span>
-                    </td>
-
-                    <td className="flex gap-2">
-                      <button
-                        onClick={() =>
-                          promoteUser(user._id)
-                        }
-                        className="btn btn-sm btn-success"
-                        disabled={user.role === "admin"}
-                      >
-                        <ShieldCheck size={16} />
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          toggleBlock(user._id)
-                        }
-                        className="btn btn-sm btn-warning"
-                      >
-                        {user.isBlocked ? (
-                          <Unlock size={16} />
-                        ) : (
-                          <Lock size={16} />
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          setSelectedUser(user)
-                        }
-                        className="btn btn-sm btn-error"
-                        disabled={user.role === "admin"}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
 
-          {/* Empty */}
-          {filteredUsers.length === 0 && (
-            <p className="text-center mt-4 text-gray-500">
-              No matching users
-            </p>
+                <tbody>
+                  {currentUsers.map((user, index) => (
+                    <tr key={user._id}>
+
+                      <td>{indexOfFirst + index + 1}</td>
+                      <td>{user.name}</td>
+                      <td>{user.email}</td>
+
+                      <td>
+                        <span className="badge">
+                          {user.role}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span
+                          className={`badge ${
+                            user.isBlocked
+                              ? "badge-error"
+                              : "badge-success"
+                          }`}
+                        >
+                          {user.isBlocked ? "Blocked" : "Active"}
+                        </span>
+                      </td>
+
+                      <td className="flex gap-2">
+
+                        <button
+                          onClick={() => promoteUser(user._id)}
+                          className="btn btn-sm btn-success"
+                          disabled={user.role === "admin"}
+                        >
+                          <ShieldCheck size={16} />
+                        </button>
+
+                        <button
+                          onClick={() => toggleBlock(user._id)}
+                          className="btn btn-sm btn-warning"
+                        >
+                          {user.isBlocked ? <Unlock size={16} /> : <Lock size={16} />}
+                        </button>
+
+                        <button
+                          onClick={() => setSelectedUser(user)}
+                          className="btn btn-sm btn-error"
+                          disabled={user.role === "admin"}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+
+              </table>
+            </div>
           )}
 
-          {/* Pagination */}
+          {/* PAGINATION */}
           <div className="flex justify-center gap-2 mt-4">
             <button
               className="btn btn-sm"
               disabled={currentPage === 1}
-              onClick={() =>
-                setCurrentPage((p) => p - 1)
-              }
+              onClick={() => setCurrentPage((p) => p - 1)}
             >
               Prev
             </button>
 
-            {Array.from(
-              { length: totalPages },
-              (_, i) => (
-                <button
-                  key={i}
-                  className={`btn btn-sm ${
-                    currentPage === i + 1
-                      ? "btn-primary"
-                      : ""
-                  }`}
-                  onClick={() =>
-                    setCurrentPage(i + 1)
-                  }
-                >
-                  {i + 1}
-                </button>
-              )
-            )}
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                className={`btn btn-sm ${
+                  currentPage === i + 1 ? "btn-primary" : ""
+                }`}
+                onClick={() => setCurrentPage(i + 1)}
+              >
+                {i + 1}
+              </button>
+            ))}
 
             <button
               className="btn btn-sm"
-              disabled={
-                currentPage === totalPages
-              }
-              onClick={() =>
-                setCurrentPage((p) => p + 1)
-              }
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
             >
               Next
             </button>
           </div>
+
         </div>
 
-        {/* Delete Modal */}
+        {/* DELETE MODAL */}
         {selectedUser && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="fixed inset-0 flex items-center justify-center bg-black/40">
+
             <div className="bg-white p-6 rounded">
-              <h2 className="text-lg font-bold mb-3">
-                Delete User
-              </h2>
+              <h2 className="font-bold mb-3">Delete User</h2>
 
               <p className="mb-4">
                 Delete {selectedUser.name}?
               </p>
 
               <div className="flex gap-3">
+
                 <button
-                  onClick={() =>
-                    setSelectedUser(null)
-                  }
                   className="btn"
+                  onClick={() => setSelectedUser(null)}
                 >
                   Cancel
                 </button>
 
                 <button
+                  className="btn btn-error"
                   onClick={() => {
                     deleteUser(selectedUser._id);
                     setSelectedUser(null);
                   }}
-                  className="btn btn-error"
                 >
                   Delete
                 </button>
+
               </div>
             </div>
+
           </div>
         )}
+
       </div>
     </>
   );

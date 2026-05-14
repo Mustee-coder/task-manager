@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import TaskCard from "../components/TaskCard";
 
+const API = import.meta.env.VITE_API_URL;
+
 const Dashboard = () => {
   const { theme } = useThemeStore();
   const navigate = useNavigate();
@@ -15,15 +17,12 @@ const Dashboard = () => {
   const [editDescription, setEditDescription] = useState("");
 
   const user = JSON.parse(localStorage.getItem("user"));
-
-  // 🔥 SAFE TOKEN GETTER
   const getToken = () => localStorage.getItem("token");
 
   // Fetch recent tasks
   const fetchRecentTasks = async () => {
     const token = getToken();
 
-    // ❌ NO TOKEN → force login
     if (!token) {
       toast.error("Session expired. Please login again.");
       navigate("/login");
@@ -31,7 +30,7 @@ const Dashboard = () => {
     }
 
     try {
-      const res = await fetch("https://task-manager-q4g7.onrender.com/api/tasks", {
+      const res = await fetch(`${API}/api/tasks`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -41,8 +40,11 @@ const Dashboard = () => {
 
       if (!res.ok) throw new Error(data.message || "Failed to fetch tasks");
 
-      const tasks = [...data.pending, ...data.completed];
-      tasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const tasks = [...(data.pending || []), ...(data.completed || [])];
+
+      tasks.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
 
       setRecentTasks(tasks.slice(0, 5));
     } catch (error) {
@@ -59,7 +61,7 @@ const Dashboard = () => {
     fetchRecentTasks();
   }, []);
 
-  // Delete task
+  // DELETE TASK
   const handleDelete = async (id) => {
     const token = getToken();
 
@@ -70,19 +72,17 @@ const Dashboard = () => {
     }
 
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/tasks/${id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await fetch(`${API}/api/tasks/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!res.ok) throw new Error("Failed to delete task");
 
       toast.success("Task deleted successfully!");
+
       setRecentTasks((prev) =>
         prev.filter((task) => task._id !== id)
       );
@@ -91,7 +91,7 @@ const Dashboard = () => {
     }
   };
 
-  // Update task
+  // UPDATE TASK
   const handleUpdate = async (id) => {
     const token = getToken();
 
@@ -101,43 +101,48 @@ const Dashboard = () => {
     }
 
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/tasks/${id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            title: editTitle,
-            description: editDescription,
-          }),
-        }
-      );
+      const res = await fetch(`${API}/api/tasks/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: editTitle,
+          description: editDescription,
+        }),
+      });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Update failed");
 
       toast.success("Task updated!");
+
       setEditingTaskId(null);
       setEditTitle("");
       setEditDescription("");
+
       fetchRecentTasks();
     } catch (error) {
       toast.error(error.message);
     }
   };
 
-  // Toggle complete
+  // TOGGLE COMPLETE
   const toggleComplete = async (task) => {
     const token = getToken();
+
+    if (!token) {
+      toast.error("Please login again");
+      navigate("/login");
+      return;
+    }
 
     try {
       const endpoint = task.completed ? "pending" : "complete";
 
       const res = await fetch(
-        `http://localhost:5000/api/tasks/${task._id}/${endpoint}`,
+        `${API}/api/tasks/${task._id}/${endpoint}`,
         {
           method: "PATCH",
           headers: {

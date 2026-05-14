@@ -2,6 +2,8 @@ import { useState } from "react";
 import { toast } from "react-toastify";
 import { useNavigate, Link } from "react-router-dom";
 
+const API = import.meta.env.VITE_API_URL;
+
 const SignupPage = () => {
   const navigate = useNavigate();
 
@@ -12,10 +14,14 @@ const SignupPage = () => {
   });
 
   const [isPending, setIsPending] = useState(false);
+
   const { name, email, password } = formData;
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
   };
 
   const handleSignup = async (e) => {
@@ -23,17 +29,18 @@ const SignupPage = () => {
     setIsPending(true);
 
     try {
-      const res = await fetch("https://task-manager-q4g7.onrender.com/api/users/signup", {
+      const res = await fetch(`${API}/api/users/signup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(formData),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.message || "Signup failed");
-        return;
+        throw new Error(data.message || "Signup failed");
       }
 
       toast.success("Signup successful");
@@ -41,7 +48,9 @@ const SignupPage = () => {
       localStorage.setItem("token", data.token);
       localStorage.setItem("userRole", data.user.role || "user");
 
-      setTimeout(() => navigate("/dashboard"), 1000);
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 800);
 
     } catch (error) {
       toast.error(error.message);
@@ -55,8 +64,7 @@ const SignupPage = () => {
 
       <form
         onSubmit={handleSignup}
-        className="w-full max-w-md bg-white border border-gray-200 
-                   rounded-lg shadow-md p-6 space-y-5"
+        className="w-full max-w-md bg-white border border-gray-200 rounded-lg shadow-md p-6 space-y-5"
       >
 
         {/* TITLE */}
@@ -77,9 +85,7 @@ const SignupPage = () => {
           value={name}
           onChange={handleChange}
           required
-          className="w-full px-4 py-3 border border-gray-300 
-                     rounded-md text-gray-700 
-                     focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="w-full px-4 py-3 border border-gray-300 rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
 
         {/* EMAIL */}
@@ -90,9 +96,7 @@ const SignupPage = () => {
           value={email}
           onChange={handleChange}
           required
-          className="w-full px-4 py-3 border border-gray-300 
-                     rounded-md text-gray-700 
-                     focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="w-full px-4 py-3 border border-gray-300 rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
 
         {/* PASSWORD */}
@@ -103,18 +107,14 @@ const SignupPage = () => {
           value={password}
           onChange={handleChange}
           required
-          className="w-full px-4 py-3 border border-gray-300 
-                     rounded-md text-gray-700 
-                     focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="w-full px-4 py-3 border border-gray-300 rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
 
         {/* BUTTON */}
         <button
           type="submit"
           disabled={isPending}
-          className="w-full bg-blue-600 text-white py-3 rounded-md 
-                     hover:bg-blue-700 transition 
-                     disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? "Creating account..." : "Create Account"}
         </button>
@@ -126,6 +126,7 @@ const SignupPage = () => {
             Sign in
           </Link>
         </p>
+
       </form>
     </div>
   );
