@@ -7,7 +7,7 @@ const PendingTasks = () => {
 
   // 🔥 CLEAN AXIOS INSTANCE
   const api = axios.create({
-    baseURL: "http://localhost:5000/api",
+    baseURL: "https://task-manager-q4g7.onrender.com/api",
   });
 
   // 🔥 AUTO ATTACH TOKEN

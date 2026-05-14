@@ -31,7 +31,7 @@ const Dashboard = () => {
     }
 
     try {
-      const res = await fetch("http://localhost:5000/api/tasks", {
+      const res = await fetch("https://task-manager-q4g7.onrender.com/api/tasks", {
         headers: {
           Authorization: `Bearer ${token}`,
         },

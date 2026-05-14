@@ -23,7 +23,7 @@ const SignupPage = () => {
     setIsPending(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/users/signup", {
+      const res = await fetch("https://task-manager-q4g7.onrender.com/api/users/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

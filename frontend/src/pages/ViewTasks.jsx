@@ -35,7 +35,7 @@ const ViewTasks = () => {
   const fetchTasks = async () => {
     try {
       const data = await fetchWithAuth(
-        "http://localhost:5000/api/tasks"
+        "https://task-manager-q4g7.onrender.com/api/tasks"
       );
 
       setPendingTasks(data.pending || []);

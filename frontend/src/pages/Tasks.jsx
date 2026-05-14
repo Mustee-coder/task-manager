@@ -20,7 +20,7 @@ const Tasks = () => {
 
   // 🔥 CLEAN AXIOS INSTANCE (NO STATIC TOKEN)
   const axiosInstance = axios.create({
-    baseURL: "http://localhost:5000/api",
+    baseURL: "https://task-manager-q4g7.onrender.com/api",
   });
 
   // 🔥 ADD INTERCEPTOR (AUTO TOKEN ATTACH)

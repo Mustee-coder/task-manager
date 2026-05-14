@@ -17,7 +17,7 @@ app.use(express.json());
 // Enable CORS
 app.use(
   cors({
-    origin: "http://localhost:5173", 
+    origin: "https://task-manager-xi-rouge-90.vercel.app", 
     methods: ["GET", "POST", "PUT", "DELETE","PATCH"],
     credentials: true,
   })
