@@ -1,7 +1,7 @@
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 
-// ================= TOKEN =================
+//  = TOKEN  =
 const generateToken = (user) => {
   if (!process.env.JWT_SECRET) {
     throw new Error("JWT_SECRET is missing");
@@ -22,7 +22,7 @@ const formatUser = (user) => ({
   role: user.role,
 });
 
-// ================= SIGNUP =================
+//  = SIGNUP  =
 export const signup = async (req, res) => {
   try {
     let { name, email, password } = req.body;
@@ -63,7 +63,7 @@ export const signup = async (req, res) => {
   }
 };
 
-// ================= LOGIN =================
+//  = LOGIN  =
 export const login = async (req, res) => {
   try {
     let { email, password } = req.body;
@@ -103,7 +103,7 @@ export const login = async (req, res) => {
   }
 };
 
-// ================= LOGOUT =================
+//  = LOGOUT  =
 export const logout = async (req, res) => {
   try {
     // JWT logout is client-side unless you use blacklist/cookies

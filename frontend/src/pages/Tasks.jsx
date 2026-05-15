@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
@@ -6,41 +6,41 @@ import TaskCard from "../components/TaskCard";
 
 const API = import.meta.env.VITE_API_URL;
 
-// Axios instance (created once)
+// Axios instance
 const axiosInstance = axios.create({
   baseURL: `${API}/api`,
 });
 
-// Attach token once
+// Attach token
 axiosInstance.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-
   return config;
 });
 
 const Tasks = () => {
   const [pendingTasks, setPendingTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("pending");
   const [loading, setLoading] = useState(false);
+  
 
   const editInputRef = useRef(null);
 
-  const getToken = () => localStorage.getItem("token");
-
   // FETCH TASKS
-  const fetchTasks = async () => {
-    const token = getToken();
+  const fetchTasks = useCallback(async () => {
+    const token = localStorage.getItem("token");
 
     if (!token) {
       toast.error("Session expired. Please login again.");
@@ -52,19 +52,20 @@ const Tasks = () => {
     try {
       const res = await axiosInstance.get("/tasks");
 
-      setPendingTasks(res.data.pending || []);
-      setCompletedTasks(res.data.completed || []);
+      setPendingTasks(res.data?.pending || []);
+      setCompletedTasks(res.data?.completed || []);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to fetch tasks");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [fetchTasks]);
 
+  // Focus edit input
   useEffect(() => {
     if (editingTaskId && editInputRef.current) {
       editInputRef.current.focus();
@@ -72,23 +73,25 @@ const Tasks = () => {
   }, [editingTaskId]);
 
   // CREATE TASK
-  const handleCreate = async (e) => {
-    e.preventDefault();
+  
 
-    try {
-      const res = await axiosInstance.post("/tasks", {
-        title,
-        description,
-      });
+const handleCreate = async (e) => {
+  e.preventDefault();
+  setLoading(true);
 
-      toast.success("Task created");
-      setPendingTasks((prev) => [...prev, res.data.task]);
-      setTitle("");
-      setDescription("");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to create task");
-    }
-  };
+  try {
+    await axiosInstance.post("/tasks", { title, description });
+
+    toast.success("Task created successfully 🎉");
+
+    setTitle("");
+    setDescription("");
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Failed to create task");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // DELETE TASK
   const handleDelete = async (task) => {
@@ -100,13 +103,9 @@ const Tasks = () => {
       toast.success("Task deleted");
 
       if (task.completed) {
-        setCompletedTasks((prev) =>
-          prev.filter((t) => t._id !== task._id)
-        );
+        setCompletedTasks((prev) => prev.filter((t) => t._id !== task._id));
       } else {
-        setPendingTasks((prev) =>
-          prev.filter((t) => t._id !== task._id)
-        );
+        setPendingTasks((prev) => prev.filter((t) => t._id !== task._id));
       }
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to delete");
@@ -129,16 +128,18 @@ const Tasks = () => {
       toast.success("Task updated");
       setEditingTaskId(null);
 
-      const update = (list) =>
+      const updateList = (list) =>
         list.map((t) =>
           t._id === task._id
             ? { ...t, title: editTitle, description: editDescription }
             : t
         );
 
-      task.completed
-        ? setCompletedTasks(update)
-        : setPendingTasks(update);
+      if (task.completed) {
+        setCompletedTasks(updateList);
+      } else {
+        setPendingTasks(updateList);
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || "Update failed");
     }
@@ -149,9 +150,7 @@ const Tasks = () => {
     try {
       const endpoint = task.completed ? "pending" : "complete";
 
-      await axiosInstance.patch(
-        `/tasks/${task._id}/${endpoint}`
-      );
+      await axiosInstance.patch(`/tasks/${task._id}/${endpoint}`);
 
       fetchTasks();
     } catch (error) {
@@ -159,13 +158,12 @@ const Tasks = () => {
     }
   };
 
-  // FILTERED TASKS (optimized)
+  // FILTER TASKS
   const tasksToShow = useMemo(() => {
-    const list =
-      activeTab === "pending" ? pendingTasks : completedTasks;
+    const list = activeTab === "pending" ? pendingTasks : completedTasks;
 
     return list.filter((t) =>
-      t.title.toLowerCase().includes(search.toLowerCase())
+      (t.title || "").toLowerCase().includes(search.toLowerCase())
     );
   }, [activeTab, pendingTasks, completedTasks, search]);
 
@@ -173,40 +171,62 @@ const Tasks = () => {
     <>
       <Navbar />
 
-      <div className="max-w-3xl mx-auto mt-10">
-
+      <div className="max-w-3xl mx-auto mt-10 px-4">
         <div className="card bg-base-200 shadow-xl">
           <div className="card-body">
 
-            <h1 className="text-2xl font-bold mb-4">
-              Task Manager
-            </h1>
+            <h1 className="text-2xl font-bold">Task Manager</h1>
 
-            {/* Create */}
-            <form onSubmit={handleCreate} className="space-y-3 mb-6">
-              <input
-                type="text"
-                className="input input-bordered w-full"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Task title"
-                required
-              />
+            {/* CREATE TASK */}
+            <form
+  onSubmit={handleCreate}
+  className="max-w-lg mx-auto bg-white p-6 rounded-2xl shadow-md space-y-5"
+>
+  <h2 className="text-xl font-semibold text-gray-800">
+    Create New Task
+  </h2>
 
-              <textarea
-                className="textarea textarea-bordered w-full"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Task description"
-                required
-              />
+  {/* Title */}
+  <div>
+    <label className="block text-sm font-medium text-gray-600">
+      Task Title
+    </label>
+    <input
+      type="text"
+      value={title}
+      onChange={(e) => setTitle(e.target.value)}
+      placeholder="Enter task title..."
+      required
+      className="w-full mt-2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+    />
+  </div>
 
-              <button className="btn btn-success w-full">
-                Create Task
-              </button>
-            </form>
+  {/* Description */}
+  <div>
+    <label className="block text-sm font-medium text-gray-600">
+      Description
+    </label>
+    <textarea
+      value={description}
+      onChange={(e) => setDescription(e.target.value)}
+      placeholder="Enter task description..."
+      rows="3"
+      required
+      className="w-full mt-2 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+    />
+  </div>
 
-            {/* Search */}
+  {/* Button */}
+  <button
+    type="submit"
+    disabled={loading}
+    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg transition disabled:opacity-60"
+  >
+    {loading ? "Creating..." : "Create Task"}
+  </button>
+</form>
+
+            {/* SEARCH */}
             <input
               className="input input-bordered w-full mb-4"
               value={search}
@@ -214,36 +234,30 @@ const Tasks = () => {
               placeholder="Search tasks..."
             />
 
-            {/* Tabs */}
+            {/* TABS */}
             <div className="tabs tabs-boxed mb-4">
               <button
-                className={`tab ${
-                  activeTab === "pending" ? "tab-active" : ""
-                }`}
+                className={`tab ${activeTab === "pending" ? "tab-active" : ""}`}
                 onClick={() => setActiveTab("pending")}
               >
                 Pending ({pendingTasks.length})
               </button>
 
               <button
-                className={`tab ${
-                  activeTab === "completed" ? "tab-active" : ""
-                }`}
+                className={`tab ${activeTab === "completed" ? "tab-active" : ""}`}
                 onClick={() => setActiveTab("completed")}
               >
                 Completed ({completedTasks.length})
               </button>
             </div>
 
-            {/* Tasks */}
+            {/* TASK LIST */}
             {loading ? (
               <p className="text-center">Loading...</p>
             ) : (
               <div className="space-y-4">
                 {tasksToShow.length === 0 && (
-                  <p className="text-gray-500">
-                    No tasks available
-                  </p>
+                  <p className="text-gray-500">No tasks available</p>
                 )}
 
                 {tasksToShow.map((task) => (

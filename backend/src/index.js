@@ -32,7 +32,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes); 
 // Test route
 app.get("/api", (req, res) => {
-  res.send("API is live 🔥🔥🔥");
+  res.send("API is live");
 });
 
 // MongoDB connection
@@ -50,6 +50,6 @@ const PORT = process.env.PORT || 5000;
 
 connectDb().then(() => {
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT} 🔥🔥🔥`);
+    console.log(`Server running on port ${PORT}`);
   });
 });

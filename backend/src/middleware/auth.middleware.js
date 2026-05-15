@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 
-// ================= AUTH MIDDLEWARE =================
+//AUTH MIDDLEWARE 
 export const auth = (req, res, next) => {
   try {
     const header = req.headers.authorization;
@@ -34,7 +34,7 @@ export const auth = (req, res, next) => {
   }
 };
 
-// ================= ADMIN ONLY =================
+//  ADMIN ONLY 
 export const adminOnly = (req, res, next) => {
   try {
     if (!req.user) {

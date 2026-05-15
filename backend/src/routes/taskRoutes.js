@@ -8,7 +8,10 @@ const router = express.Router();
 router.post("/", auth, async (req, res) => {
   try {
     const task = await Task.create({ ...req.body, owner: req.user.id });
-    res.status(201).json(task);
+    res.status(201).json({
+  task,
+  message: "task created"
+});
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
